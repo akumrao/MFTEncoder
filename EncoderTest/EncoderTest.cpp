@@ -156,6 +156,54 @@ public:
 
 };
 
+HRESULT DisplayMFT(IMFActivate* pMFActivate) {
+	HRESULT hr;
+
+	// get the CLSID GUID from the IMFAttributes of the activation object
+	GUID guidMFT = { 0 };
+	hr = pMFActivate->GetGUID(MFT_TRANSFORM_CLSID_Attribute, &guidMFT);
+	if (MF_E_ATTRIBUTENOTFOUND == hr) {
+		std::cout << "IMFTransform has no CLSID." << std::endl;
+		return hr;
+	}
+	else if (FAILED(hr)) {
+		std::cerr << "IMFAttributes::GetGUID(MFT_TRANSFORM_CLSID_Attribute) failed: hr = " << hr << std::endl;
+		return hr;
+	}
+
+	LPWSTR szGuid = NULL;
+	hr = StringFromIID(guidMFT, &szGuid);
+	if (FAILED(hr)) {
+		std::cerr << "StringFromIID failed: hr = " << hr << std::endl;
+		return hr;
+	}
+
+	// get the friendly name string from the IMFAttributes of the activation object
+	LPWSTR szFriendlyName = NULL;
+	UINT len = 0;
+	hr = pMFActivate->GetAllocatedString(
+		MFT_FRIENDLY_NAME_Attribute,
+		&szFriendlyName,
+		&len
+	);
+
+	if (MF_E_ATTRIBUTENOTFOUND == hr) {
+		std::cout << "IMFTransform has no friendly name." << std::endl;
+		return hr;
+	}
+	else if (FAILED(hr)) {
+		std::cerr << "IMFAttributes::GetAllocatedString(MFT_FRIENDLY_NAME_Attribute) failed: hr = " << hr << std::endl;
+		return hr;
+	}
+	//CoTaskMemFreeOnExit freeFriendlyName(szFriendlyName);
+
+	std::wcout << szFriendlyName << " (" << szGuid << ")" << std::endl;
+
+	CoTaskMemFree(szGuid);
+	CoTaskMemFree(szFriendlyName);
+
+	return S_OK;
+}
 ///////////////////////
 
 int main()
@@ -298,31 +346,46 @@ int main()
 
 
 
+	// h264 output
+	//MFT_REGISTER_TYPE_INFO info = { MFMediaType_Video, MFVideoFormat_H264 };
 
 	MFT_REGISTER_TYPE_INFO videoNV12 = { MFMediaType_Video, MFVideoFormat_NV12 };
+	// MFT_REGISTER_TYPE_INFO videoRgb24 = { MFMediaType_Video, MFVideoFormat_RGB24 };
 	MFT_REGISTER_TYPE_INFO videoH264 = { MFMediaType_Video, MFVideoFormat_H264 };
 
-	UINT32 flags = MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_ASYNCMFT | MFT_ENUM_FLAG_LOCALMFT | MFT_ENUM_FLAG_HARDWARE | MFT_ENUM_FLAG_SORTANDFILTER;
+	UINT32 flags =
+		MFT_ENUM_FLAG_HARDWARE |
+		MFT_ENUM_FLAG_SORTANDFILTER;
+
+	UINT32 flags1 = MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_ASYNCMFT | MFT_ENUM_FLAG_LOCALMFT | MFT_ENUM_FLAG_HARDWARE | MFT_ENUM_FLAG_SORTANDFILTER;
 
 	hr = MFTEnumEx(
 		MFT_CATEGORY_VIDEO_ENCODER,
-		flags,
+		flags1,
 		&videoNV12,
 		&videoH264,
 		&activateRaw,
 		&activateCount
 	);
-
-	// h264 output
 	CHECK_HR(hr, "Failed to enumerate MFTs");
 
 	CHECK(activateCount, "No MFTs found");
+
+
+	printf("MFT count %d.\n", activateCount);
+
+	for (int i = 0; i < activateCount; i++) {
+		auto hr = DisplayMFT(activateRaw[i]);
+	}
 
 	// Choose the first available encoder
 	Microsoft::WRL::ComPtr<IMFActivate> activate = activateRaw[0];
 
 	for (UINT32 i = 0; i < activateCount; i++)
 		activateRaw[i]->Release();
+
+	DisplayMFT(activate.Get());
+	CoTaskMemFree(activateRaw);
 
 	// Activate
 	hr = activate->ActivateObject(IID_PPV_ARGS(&transform));
@@ -332,6 +395,9 @@ int main()
 	hr = transform->GetAttributes(&attributes);
 	CHECK_HR(hr, "Failed to get MFT attributes");
 
+
+
+	/*
 	// Get encoder name
 	UINT32 nameLength = 0;
 	std::wstring name;
@@ -348,10 +414,12 @@ int main()
 	name.resize(nameLength);
 
 	std::wcout << name << std::endl;
+	*/
 
 	// Unlock the transform for async use and get event generator
 	hr = attributes->SetUINT32(MF_TRANSFORM_ASYNC_UNLOCK, TRUE);
 	CHECK_HR(hr, "Failed to unlock MFT");
+
 
 	//eventGen = transform;
 

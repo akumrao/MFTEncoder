@@ -108,8 +108,12 @@ public:
 		hr = pVideoDevice->CreateVideoProcessorEnumerator(&contentDesc, &pVideoProcessorEnumerator);
 		//CHECK_HR(hr);
 		hr = pVideoDevice->CreateVideoProcessor(pVideoProcessorEnumerator, 0, &pVideoProcessor);
+		if (hr != S_OK)
+			std::cout << "Error at RGBToNV12::CreateVideoProcessor" << std::endl << std::flush;
 		D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inputViewDesc = { 0, D3D11_VPIV_DIMENSION_TEXTURE2D, { 0, 0 } };
 		hr = pVideoDevice->CreateVideoProcessorInputView(pTexBgra, pVideoProcessorEnumerator, &inputViewDesc, &pInputView);
+		if (hr != S_OK)
+			std::cout << "Error at RGBToNV12::CreateVideoProcessorInputView" << std::endl << std::flush;
 	//	CHECK_HR(hr, "CreateVideoProcessorInputView");
 	}
 
@@ -140,6 +144,8 @@ public:
 		{
 			D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC outputViewDesc = { D3D11_VPOV_DIMENSION_TEXTURE2D };
 			hr = pVideoDevice->CreateVideoProcessorOutputView(pDestTexture, pVideoProcessorEnumerator, &outputViewDesc, &pOutputView1);
+			if (hr != S_OK)
+				std::cout << "Error at RGBToNV12::CreateVideoProcessorOutputView" << std::endl << std::flush;
 			outputViewMap1.insert({ pDestTexture, pOutputView1 });
 		}
 		else
@@ -149,7 +155,7 @@ public:
 
 		D3D11_VIDEO_PROCESSOR_STREAM stream = { true, 0, 0, 0, 0, NULL, pInputView, NULL };
 		hr = pVideoContext->VideoProcessorBlt(pVideoProcessor, pOutputView1, 0, 1, &stream);
-		CHECK_HR(hr, "VideoProcessorBlt");
+		CHECK_HR(hr, "Error at RGBToNV12::VideoProcessorBlt");
 		return hr;
 	}
 
@@ -345,12 +351,7 @@ int main()
 	UINT32 activateCount = 0;
 
 
-
-	// h264 output
-	//MFT_REGISTER_TYPE_INFO info = { MFMediaType_Video, MFVideoFormat_H264 };
-
 	MFT_REGISTER_TYPE_INFO videoNV12 = { MFMediaType_Video, MFVideoFormat_NV12 };
-	// MFT_REGISTER_TYPE_INFO videoRgb24 = { MFMediaType_Video, MFVideoFormat_RGB24 };
 	MFT_REGISTER_TYPE_INFO videoH264 = { MFMediaType_Video, MFVideoFormat_H264 };
 
 	UINT32 flags =
